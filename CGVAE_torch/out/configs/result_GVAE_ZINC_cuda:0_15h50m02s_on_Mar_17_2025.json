@@ -1,0 +1,39 @@
+{
+    "gpu_id": "0",
+    "outdir": "out/",
+    "data": {
+        "root": "data",
+        "dataset_name": "ZINC",
+        "edge_sample_size": 1.0,
+        "neg_edge_sample_size": 1.0,
+        "atom_sample_size": 1.0
+    },
+    "Loss": {
+        "lambda_1": 1e-08,
+        "lambda_2": 0.0
+    },
+    "ratio": 1.0,
+    "params": {
+        "model": "GVAE",
+        "encoder": "GCN",
+        "seed": 56,
+        "epochs": 500,
+        "batch_size": 256,
+        "init_lr": 0.01,
+        "lr_reduce_factor": 0.5,
+        "lr_schedule_patience": 10,
+        "min_lr": 1e-05,
+        "weight_decay": 0.0,
+        "print_epoch_interval": 10,
+        "max_time": 12,
+        "optimizer": "Adam"
+    },
+    "net_params": {
+        "num_layers": 5,
+        "hidden_channels": 64,
+        "in_channels": 16,
+        "out_channels": 16
+    },
+    "device": "cuda:0",
+    "outname": "result_GVAE_ZINC_cuda:0_15h50m02s_on_Mar_17_2025"
+}
