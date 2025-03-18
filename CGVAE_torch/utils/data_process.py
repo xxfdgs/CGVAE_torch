@@ -7,7 +7,7 @@ import torch
 from torch_geometric.datasets import ZINC
 from tqdm import tqdm
 
-def create_dataset(root, dataset_name,atom_sample_size=1.0, 
+def create_dataset(root, dataset_name,subset=True,atom_sample_size=1.0, 
                    edge_sample_size=1.0, 
                    neg_edge_sample_size=0.25):
     """
@@ -111,29 +111,29 @@ def create_dataset(root, dataset_name,atom_sample_size=1.0,
         
 
     elif dataset_name == "ZINC":
-        
-        train_dataset = ZINC(root=root, split="train", transform=lambda data: sample_edge(data,atom_sample_size, 
+        if subset:
+            train_dataset = ZINC(root=root, split="train", transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size), subset=True)
-        val_dataset = ZINC(root=root, split="val", transform=lambda data: sample_edge(data,atom_sample_size, 
+            val_dataset = ZINC(root=root, split="val", transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size), subset=True)
-        test_dataset = ZINC(root=root, split="test", transform=lambda data: sample_edge(data,atom_sample_size, 
+            test_dataset = ZINC(root=root, split="test", transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size), subset=True)
-        """
-        
-        train_dataset = ZINC(root=root, split="train",
+            print(f"Using ZINC subset")
+        else:
+            train_dataset = ZINC(root=root, split="train",
                             transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size))
-        val_dataset = ZINC(root=root, split="val", transform=lambda data: sample_edge(data,atom_sample_size, 
+            val_dataset = ZINC(root=root, split="val", transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size))
-        test_dataset = ZINC(root=root, split="test", transform=lambda data: sample_edge(data,atom_sample_size, 
+            test_dataset = ZINC(root=root, split="test", transform=lambda data: sample_edge(data,atom_sample_size, 
                                                    edge_sample_size, 
                                                    neg_edge_sample_size))
-        """
+            print(f"Using ZINC full")
         print(test_dataset[0])
         
         return train_dataset, val_dataset, test_dataset
