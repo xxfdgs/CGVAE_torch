@@ -5,7 +5,7 @@ from torch_geometric.data import Data
 import torch.nn as nn
 import torch.nn.functional as F
 
-from encoder.encoder import GCNEncoder, GraphSAGEncoder, GINEncoder
+from encoder.encoder import GCNEncoder, GraphSAGEncoder, GINEncoder,GATEncoder
 def check_nan_inf(tensor, name=""):
     if torch.isnan(tensor).any():
         raise ValueError(f"NaN detected in tensor: {name}")
@@ -48,8 +48,10 @@ class GraphVAE(nn.Module):
             self.encoder = GINEncoder(in_channels, hidden_channels, num_layers,out_channels)
         elif config["params"]["encoder"] == "GCN":
             self.encoder = GCNEncoder(in_channels, hidden_channels, num_layers,out_channels)
+        elif config["params"]["encoder"] == "GAT":
+            self.encoder = GATEncoder(in_channels, hidden_channels, num_layers,out_channels)
         else:
-            raise ValueError(f"Unsupported encoder: {config['params']['encoder']}. Please choose 'GraphSAGE', 'GIN', or 'GCN'.")
+            raise ValueError(f"Unsupported encoder: {config['params']['encoder']}. Please choose 'GraphSAGE', 'GIN', 'GAT',or 'GCN'.")
         # Decoder can be implemented according to the desired task.
         # Often in graph VAEs, the decoder computes node similarity, e.g., using dot product.
 
@@ -127,14 +129,16 @@ class GraphVAE(nn.Module):
         #暂时只考虑无向图
         edge_index = [[],[]]
         edge_attr = []
-        atom_type = torch.argmax(self.atom_type_predictor(z),dim=-1)
+        atom_probabilities = F.softmax(self.atom_type_predictor(z), dim=-1)
+        atom_type = torch.multinomial(atom_probabilities, 1).squeeze()
         print(atom_type)
         for i in range(z.shape[0]):
             for j in range(i+1,z.shape[0]):
                 feature = torch.cat((z[i],z[j]),dim=0)
                 edge_probability = self.edge_link_predictor(feature.unsqueeze(0))
                 print(f"edge for {i} and {j}:{edge_probability}\n")
-                edge_pred = torch.argmax(edge_probability)
+                edge_probabilities = F.softmax(edge_probability, dim=-1)
+                edge_pred = torch.multinomial(edge_probabilities, 1).item()
                 if edge_pred!=0:
                     edge_index[0].append(i)
                     edge_index[1].append(j)
