@@ -32,8 +32,8 @@ def loss_calculate(true_edge_predict,true_edge_attr,
     weights[0]=0.5
     atom_type_loss = F.cross_entropy(predicted_atom_type[sample_atom_indices], 
                                      atom_type.long()[sample_atom_indices].view(-1))
-
-    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    #这里的sum与mean的选择可能十分重要
+    KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
     #print(f"BCE_true:{BCE_true},BCE_neg:{BCE_neg},atom:{atom_type_loss},KLD:{KLD}")
     loss = BCE + atom_type_loss + lambda_1 * KLD
     if lambda_2 != 0.0:
@@ -78,15 +78,27 @@ def train_network(model, data_loader, optimizer, device, epoch,lambda_1,lambda_2
     total_atom_type_loss = []
     total_BCE = []
     total_KLD = []
+    # Add lists to store mu and logvar statistics
+    all_mu_means = []
+    all_mu_stds = []
+    all_logvar_means = []
+    all_logvar_stds = []
+    
     for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
         predicted_atom_type, true_edge_pred,mu, logvar = \
                                             model(data.x, data.edge_index,data.edge_attr, data.sampled_edge_index)
+        
+        # Store statistics for this batch
+        all_mu_means.append(mu.mean().item())
+        all_mu_stds.append(mu.std().item())
+        all_logvar_means.append(logvar.mean().item())
+        all_logvar_stds.append(logvar.std().item())
+        
         loss,BCE,atom_type_loss,KLD = loss_calculate(true_edge_pred, data.sampled_edge_attr,
                               data.x, predicted_atom_type,data.sample_atom_indices,
                               mu, logvar,lambda_1,lambda_2)
-        #print(loss)
         loss.backward()
         optimizer.step()
         total_loss += loss.detach().item()
@@ -98,15 +110,22 @@ def train_network(model, data_loader, optimizer, device, epoch,lambda_1,lambda_2
         total_atom_type_loss.append(atom_type_loss.detach().item())
         total_KLD.append(KLD.detach().item())
 
-        #print(total_edge_accuracy)
+    # Calculate averages
+    avg_mu_mean = sum(all_mu_means) / len(all_mu_means)
+    avg_mu_std = sum(all_mu_stds) / len(all_mu_stds)
+    avg_logvar_mean = sum(all_logvar_means) / len(all_logvar_means)
+    avg_logvar_std = sum(all_logvar_stds) / len(all_logvar_stds)
+    
+    #print(f"Average mu mean: {avg_mu_mean:.4f}, Average mu std: {avg_mu_std:.4f}")
+    #print(f"Average logvar mean: {avg_logvar_mean:.4f}, Average logvar std: {avg_logvar_std:.4f}")
 
     avg_atom_accuracy = sum(total_atom_accuracy) / len(total_atom_accuracy)
     avg_edge_accuracy = sum(total_edge_accuracy) / len(total_edge_accuracy)
     avg_BCE = sum(total_BCE) / len(total_BCE)
     avg_atom = sum(total_atom_type_loss) / len(total_atom_type_loss)
     avg_KLD = sum(total_KLD) / len(total_KLD)
-    #print(avg_edge_accuracy)
-    return total_loss / len(data_loader), avg_atom_accuracy, avg_edge_accuracy,optimizer,avg_BCE,avg_atom_accuracy,avg_KLD
+    
+    return total_loss / len(data_loader), avg_atom_accuracy, avg_edge_accuracy,optimizer,avg_BCE,avg_atom_accuracy,avg_KLD,avg_mu_mean,avg_mu_std,avg_logvar_mean,avg_logvar_std
             
 
 def evaluate_network(model, data_loader, device, epoch,lambda_1,lambda_2):
@@ -121,11 +140,22 @@ def evaluate_network(model, data_loader, device, epoch,lambda_1,lambda_2):
     total_atom_type_loss = []
     total_BCE = []
     total_KLD = []
+    all_mu_means = []
+    all_mu_stds = []
+    all_logvar_means = []
+    all_logvar_stds = []
+    
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
             predicted_atom_type, true_edge_pred,mu, logvar = model(data.x, data.edge_index,data.edge_attr,
                                                                                        data.sampled_edge_index)
+            # Store statistics for this batch
+            all_mu_means.append(mu.mean().item())
+            all_mu_stds.append(mu.std().item())
+            all_logvar_means.append(logvar.mean().item())
+            all_logvar_stds.append(logvar.std().item())
+            
             loss,BCE,atom_type_loss,KLD = loss_calculate(true_edge_pred, data.sampled_edge_attr,
                                   data.x, predicted_atom_type,data.sample_atom_indices,
                                   mu, logvar,lambda_1,lambda_2)
@@ -138,15 +168,22 @@ def evaluate_network(model, data_loader, device, epoch,lambda_1,lambda_2):
             total_atom_type_loss.append(atom_type_loss.detach().item())
             total_KLD.append(KLD.detach().item())
 
-            #print(total_edge_accuracy)
+    # Calculate averages
+    avg_mu_mean = sum(all_mu_means) / len(all_mu_means)
+    avg_mu_std = sum(all_mu_stds) / len(all_mu_stds)
+    avg_logvar_mean = sum(all_logvar_means) / len(all_logvar_means)
+    avg_logvar_std = sum(all_logvar_stds) / len(all_logvar_stds)
+    
+    #print(f"Average mu mean: {avg_mu_mean:.4f}, Average mu std: {avg_mu_std:.4f}")
+    #print(f"Average logvar mean: {avg_logvar_mean:.4f}, Average logvar std: {avg_logvar_std:.4f}")
 
     avg_atom_accuracy = sum(total_atom_accuracy) / len(total_atom_accuracy)
     avg_edge_accuracy = sum(total_edge_accuracy) / len(total_edge_accuracy)
     avg_BCE = sum(total_BCE) / len(total_BCE)
     avg_atom = sum(total_atom_type_loss) / len(total_atom_type_loss)
     avg_KLD = sum(total_KLD) / len(total_KLD)
-    #print(avg_edge_accuracy)
-    return total_loss / len(data_loader), avg_atom_accuracy, avg_edge_accuracy,avg_BCE,avg_atom_accuracy,avg_KLD
+    
+    return total_loss / len(data_loader), avg_atom_accuracy, avg_edge_accuracy,avg_BCE,avg_atom_accuracy,avg_KLD,avg_mu_mean,avg_mu_std,avg_logvar_mean,avg_logvar_std
 
 def view_model_params(model):
     """
@@ -230,17 +267,17 @@ def run(train_dataset, val_dataset, test_dataset, config):
 
                 start = time.time()
                 
-                train_loss, train_atom_accuracy, train_edge_accuracy, optimizer,train_BCE,train_atom_type_loss,train_KLD \
-                = train_network(model, train_dataloader,optimizer, device, epoch,
+                train_loss, train_atom_accuracy, train_edge_accuracy, optimizer,train_BCE,train_atom_type_loss,train_KLD, \
+                train_avg_mu,train_std_mu,train_avg_logvar,train_std_logvar= train_network(model, train_dataloader,optimizer, device, epoch,
                                 lambda_1,lambda_2)
                 
-                val_loss, val_atom_accuracy, val_edge_accuracy,val_BCE,val_atom_type_loss,val_KLD \
-                    = evaluate_network(model, val_dataloader, device, epoch,lambda_1,lambda_2)
+                val_loss, val_atom_accuracy, val_edge_accuracy,val_BCE,val_atom_type_loss,val_KLD, \
+                val_avg_mu,val_std_mu,val_avg_logvar,val_std_logvar    = evaluate_network(model, val_dataloader, device, epoch,lambda_1,lambda_2)
                 
-                _, test_atom_accuracy, test_edge_accuracy,_,_,_ \
+                _, test_atom_accuracy, test_edge_accuracy,_,_,_,_,_,_,_ \
                     =evaluate_network(model, test_dataloader, device, epoch,lambda_1,lambda_2)
 
-                if (val_atom_accuracy>0.85 and val_edge_accuracy>0.85):
+                if (val_atom_accuracy>0.8 and val_edge_accuracy>0.8):
                     if lambda_1<=0.1:
                         lambda_1 = lambda_1*10
                         print(f"lambda_1={lambda_1}")
@@ -266,6 +303,16 @@ def run(train_dataset, val_dataset, test_dataset, config):
                 writer.add_scalar("KLD_Loss/val",val_KLD,epoch)
                 writer.add_scalar("Atom_Loss/train",train_atom_type_loss,epoch)
                 writer.add_scalar("Atom_Loss/val",val_atom_type_loss,epoch)
+
+                writer.add_scalar("Mu_Mean/train",train_avg_mu,epoch)
+                writer.add_scalar("Mu_Mean/val",val_avg_mu,epoch)
+                writer.add_scalar("Mu_Std/train",train_std_mu,epoch)
+                writer.add_scalar("Mu_Std/val",val_std_mu,epoch)
+
+                writer.add_scalar("Logvar_Mean/train",train_avg_logvar,epoch)
+                writer.add_scalar("Logvar_Mean/val",val_avg_logvar,epoch)
+                writer.add_scalar("Logvar_Std/train",train_std_logvar,epoch)
+                writer.add_scalar("Logvar_Std/val",val_std_logvar,epoch)
 
                 t.set_postfix(#time=time.time()-start,
                               #lr=optimizer.param_groups[0]["lr"],
@@ -332,7 +379,8 @@ if __name__ == "__main__":
     atom_sample_size = config["data"]["atom_sample_size"]
     edge_sample_size = config["data"]["edge_sample_size"]
     neg_edge_sample_size = config["data"]["neg_edge_sample_size"]
-    train_dataset, val_dataset, test_dataset = create_dataset(root, dataset_name,atom_sample_size
+    subset = config["data"]["subset"]
+    train_dataset, val_dataset, test_dataset = create_dataset(root, dataset_name,subset, atom_sample_size
                                                               ,edge_sample_size,neg_edge_sample_size)
 
 

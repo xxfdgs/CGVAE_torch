@@ -68,7 +68,7 @@ def generate_molecule(model, device='cpu',embed_dim=64):
 
 if __name__ == '__main__':
     config = load_params()
-    checkpoint_dir = "/home/puzexuan/study/code/CGVAE/CGVAE_torch/out/checkpoints/result_GVAE_ZINC_cuda:0_19h14m07s_on_Mar_14_2025"
+    checkpoint_dir = "/home/puzexuan/study/code/CGVAE/CGVAE_torch/out/checkpoints/result_GVAE_ZINC_cuda:0_11h35m33s_on_Mar_18_2025"
     pth_files = [f for f in os.listdir(checkpoint_dir) if f.endswith('.pth')]
     if not pth_files:
         raise FileNotFoundError("No .pth files found in the directory")
